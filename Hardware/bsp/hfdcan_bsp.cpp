@@ -10,7 +10,9 @@ uint32_t rxNotification(FDCAN_HandleTypeDef* bus) noexcept {
 
 bool startWithInterrupt(FDCAN_HandleTypeDef* bus) noexcept {
     if (HAL_FDCAN_Start(bus) != HAL_OK) return false;
-    if (HAL_FDCAN_ActivateNotification(bus, rxNotification(bus), 0) == HAL_OK) return true;
+    if (HAL_FDCAN_ActivateNotification(bus, rxNotification(bus) | FDCAN_IT_BUS_OFF, 0) == HAL_OK) {
+        return true;
+    }
     HAL_FDCAN_Stop(bus);
     return false;
 }
@@ -72,4 +74,17 @@ extern "C" void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef* bus, uint32_t fla
 
 extern "C" void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef* bus, uint32_t flags) {
     if (flags & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) drain(bus, FDCAN_RX_FIFO1);
+}
+
+// Bus_Off is recovered in place. Clearing CCCR.INIT (HAL_FDCAN_Start) puts the
+// controller back into the bus-off recovery sequence: it waits for 129
+// occurrences of 11 recessive bits, then resumes transmission on its own.
+// Soft_Restart aborts the stale Tx requests first, so no queued motor command is
+// replayed onto the bus after the fault. If the restart itself fails (the HAL
+// state machine drops to ERROR after a Stop timeout), the bus stays silent and
+// the application has to escalate to can_bus::Hard_Restart.
+extern "C" void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef* bus, uint32_t flags) {
+    if (flags & FDCAN_IT_BUS_OFF) {
+        (void)can_bus::Soft_Restart(bus);
+    }
 }

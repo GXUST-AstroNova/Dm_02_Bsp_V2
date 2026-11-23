@@ -11,6 +11,8 @@
 
 FDCAN2 的内核时钟为 80 MHz。仲裁段每位为 `2 × (1 + 32 + 7)` 个时钟，数据段每位为 `1 × (1 + 11 + 4)` 个时钟。两种格式均使用 11 位标准 ID 和 8 字节 MIT 载荷。电调的模式和波特率须与该节点匹配；发送 FD 帧的物理总线上，其他节点也须能容忍 FD 帧。
 
+总线进入 Bus_Off 后，`hfdcan_bsp` 在错误状态中断里自动调用 `can_bus::Soft_Restart`：先中止未发完的 Tx 请求，再清除 `CCCR.INIT`，控制器自行完成 129 次 11 个连续隐性位的恢复序列后继续收发。若软复位本身失败（`HAL_FDCAN_Stop` 超时会让 HAL 状态机进入 ERROR），总线保持静默且不再上报，需要应用层调用 `can_bus::Hard_Restart` 兜底。
+
 - 达妙使用 `init(command_id, feedback_id)` 注册。第一个参数是发往电调的命令 ID（CAN ID），第二个是电调反馈帧的返回 ID（Master ID）。在构造和注册时都可以直接写整数字面量或 `constexpr` 整数。编译器在缩窄转换前检查两个 ID 是否都在 `0x000…0x7FF` 内。
 - 帧格式默认跟随总线。要显式选择经典 CAN 或 CAN FD + BRS，第三个参数传 `DmCanMode::Classic` 或 `DmCanMode::FdBrs`。原有 `Dm4310 joint(&hfdcan2, command_id, feedback_id)` 写法仍可用，随后调用 `joint.init()` 或 `joint.init(mode)` 注册构造时给定的地址。
 - 在 `Motor/DM/dm_models.hpp` 中为使用的子型号填写与电调寄存器一致的 `T_MAX`。构造该型号时编译器要求它是有限正数，未使用的型号可以保留占位值。自定义型号继承 `DmMotorModel<型号>`，参照 `Dm4310` 声明 `T_MAX` 并继承构造函数。各型号共用 `P_MAX = 12.5664 rad` 和 `V_MAX = 45 rad/s`。
