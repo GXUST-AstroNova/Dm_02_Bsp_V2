@@ -1,11 +1,4 @@
-add_subdirectory(Motor)
-add_subdirectory(Imu)
-
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    bsp/hfdcan_bsp.cpp bsp/uart_bsp.cpp
-    Controller/base_rc_receiver.cpp Controller/FlySky/sbus.cpp
-    Flash/w25q.cpp
-    Led/ws2812.cpp Led/ws2812_codec.cpp
-    Buzzer/base_buzzer.cpp Buzzer/pwm_buzzer.cpp)
+# Tools：仅头文件的通用组件（irq_guard.hpp 等）与第三方库。
+# 让其它模块可以直接 #include "irq_guard.hpp"。
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    bsp Controller Controller/FlySky Flash Led Buzzer)
+    ${CMAKE_CURRENT_SOURCE_DIR})
