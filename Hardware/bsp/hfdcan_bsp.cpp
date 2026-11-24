@@ -4,6 +4,13 @@
 #include <algorithm>
 
 namespace {
+std::array<can_bus::RxStats, 3> g_stats{};
+
+can_bus::RxStats& statsOf(const FDCAN_HandleTypeDef* bus) noexcept {
+    const std::size_t index = !bus ? 0U : bus->Instance == FDCAN2 ? 1U : bus->Instance == FDCAN3 ? 2U : 0U;
+    return g_stats[index];
+}
+
 uint32_t rxNotification(FDCAN_HandleTypeDef* bus) noexcept {
     return bus->Init.RxFifo0ElmtsNbr ? FDCAN_IT_RX_FIFO0_NEW_MESSAGE : FDCAN_IT_RX_FIFO1_NEW_MESSAGE;
 }
@@ -21,21 +28,33 @@ void drain(FDCAN_HandleTypeDef* bus, uint32_t fifo) noexcept {
     // FDCAN2 FIFO1 holds up to 64 bytes. HAL copies before we can inspect the DLC.
     std::array<uint8_t, 64> buffer{};
     FDCAN_RxHeaderTypeDef header{};
+    auto& stats = statsOf(bus);
     while (HAL_FDCAN_GetRxFifoFillLevel(bus, fifo)) {
         if (HAL_FDCAN_GetRxMessage(bus, fifo, &header, buffer.data()) != HAL_OK) break;
+        ++stats.frames;
+        // DataLength is the DLC code, so < 8 rejects only frames shorter than the
+        // 8-byte motor payload. FD frames carry the same 8 bytes in their first
+        // words, and a DM drive may answer with either frame format.
         if (header.IdType != FDCAN_STANDARD_ID || header.RxFrameType != FDCAN_DATA_FRAME ||
-            header.DataLength != FDCAN_DLC_BYTES_8) continue;
-        const bool classic = header.FDFormat == FDCAN_CLASSIC_CAN && header.BitRateSwitch == FDCAN_BRS_OFF;
-        const bool fd_brs = header.FDFormat == FDCAN_FD_CAN && header.BitRateSwitch == FDCAN_BRS_ON;
+            header.DataLength < FDCAN_DLC_BYTES_8) {
+            ++stats.ignored;
+            continue;
+        }
+        const bool classic = header.FDFormat == FDCAN_CLASSIC_CAN;
         motor_can::Payload payload{};
         std::copy_n(buffer.begin(), payload.size(), payload.begin());
-        if (classic && DjiMotorGroup::dispatch(bus, header.Identifier, payload)) continue;
-        if (fd_brs || classic) {
-            DmMotor::dispatch(bus, header.Identifier, payload, fd_brs);
+        if (classic && DjiMotorGroup::dispatch(bus, header.Identifier, payload)) {
+            ++stats.routed;
+            continue;
         }
+        if (DmMotor::dispatch(bus, header.Identifier, payload)) ++stats.routed;
     }
 }
 } // namespace
+
+can_bus::RxStats can_bus::Rx_Stats(FDCAN_HandleTypeDef* bus) noexcept {
+    return statsOf(bus);
+}
 
 bool can_bus::start(FDCAN_HandleTypeDef* bus) noexcept {
     if (!bus || (!bus->Init.RxFifo0ElmtsNbr && !bus->Init.RxFifo1ElmtsNbr)) return false;

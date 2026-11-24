@@ -33,8 +33,11 @@ public:
     bool setTorqueLimit(float limit_nm) noexcept;  // clamps only the feed-forward command
 
     static SendResult sendAll() noexcept;
+    // Frame format is deliberately ignored here: a DM drive may answer with a
+    // classic frame or a CAN FD frame (BRS on or off), so ownership is decided
+    // by bus, feedback ID and the motor-ID nibble in D0[3:0].
     static bool dispatch(FDCAN_HandleTypeDef* bus, uint16_t feedback_id,
-                         const motor_can::Payload& data, bool fd_brs) noexcept;
+                         const motor_can::Payload& data) noexcept;
 
 protected:
     DmMotor(FDCAN_HandleTypeDef* bus, float t_max) noexcept;
