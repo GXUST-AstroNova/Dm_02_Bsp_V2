@@ -29,6 +29,7 @@ float SMC::Calculate(float target, float measurement) noexcept {
     const double last_error = previous_error_;
     previous_error_ = error;
     target_ = target;
+    measurement_ = measurement;
 
     const double integral_limit = integral_limit_;
     integral_ = std::clamp(integral_ + 0.5 * (error + last_error) * dt_,
@@ -67,6 +68,8 @@ float PositionalSMC::Calculate(float target_position, float position, float velo
         !std::isfinite(position) || !std::isfinite(velocity)) {
         return output_;
     }
+    speed_measurement_ = velocity;
+    position_measurement_ = position;
 
     const double error = static_cast<double>(target_position) - position;
     const double rate = velocity;
@@ -87,4 +90,6 @@ float PositionalSMC::Calculate(float position, float velocity) noexcept {
 void PositionalSMC::Reset() noexcept {
     target_ = 0.0f;
     output_ = 0.0f;
+    speed_measurement_ = 0.0f;
+    position_measurement_ = 0.0f;
 }

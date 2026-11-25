@@ -22,7 +22,9 @@ public:
     float Calculate(float target, float measurement) noexcept;
     float Calculate(float measurement) noexcept;
     void Reset() noexcept;
-
+    float target_{};
+    float output_{};
+    float measurement_{};
 private:
     float linear_gain_, switching_gain_, boundary_width_, output_limit_;
     bool valid_;
@@ -31,8 +33,7 @@ private:
     float dt_{};
     double integral_{};
     double previous_error_{};
-    float target_{};
-    float output_{};
+    
 };
 
 /**
@@ -50,10 +51,12 @@ public:
     float Calculate(float target_position, float position, float velocity) noexcept;
     float Calculate(float position, float velocity) noexcept;
     void Reset() noexcept;
-
-private:
-    float surface_gain_, linear_gain_, switching_gain_, boundary_width_, output_limit_;
-    bool valid_;
     float target_{};
     float output_{};
+    float speed_measurement_{};
+    float position_measurement_{};
+    private:
+    float surface_gain_, linear_gain_, switching_gain_, boundary_width_, output_limit_;
+    bool valid_;
+    
 };

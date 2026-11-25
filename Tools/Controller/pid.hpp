@@ -11,6 +11,9 @@
 class PID {
 public:
     void Reset() noexcept;
+    float target_{};
+    float output_{};
+    float measurement_{};
 
 protected:
     static constexpr float unlimited = std::numeric_limits<float>::infinity();
@@ -23,8 +26,6 @@ protected:
     float previous_error_{};
     float integral_{};
     float previous_derivative_{};
-    float target_{};
-    float output_{};
     bool first_step_{true};
 };
 

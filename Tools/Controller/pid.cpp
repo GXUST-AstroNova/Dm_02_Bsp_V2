@@ -25,7 +25,7 @@ float PositionalPID::Calculate(float target, float measurement) noexcept {
     if (!valid_ || !std::isfinite(target) || !std::isfinite(measurement)) {
         return output_;
     }
-
+    measurement_ = measurement;
     const float error = target - measurement;
     integral_ = std::clamp(integral_ + error * dt_, -i_limit_, i_limit_);
     const float derivative = first_step_ ? 0.0f : (error - previous_error_) / dt_;
@@ -52,7 +52,7 @@ float IncrementalPID::Calculate(float target, float measurement) noexcept {
     if (!valid_ || !std::isfinite(target) || !std::isfinite(measurement)) {
         return output_;
     }
-
+    measurement_ = measurement;
     const float error = target - measurement;
     const float delta_error = error - previous_error_;
     const float integral = std::clamp(integral_ + error * dt_, -i_limit_, i_limit_);
@@ -84,7 +84,7 @@ float IntegralScopePID::Calculate(float target, float measurement) noexcept {
     if (!valid_ || !std::isfinite(target) || !std::isfinite(measurement)) {
         return output_;
     }
-
+    measurement_ = measurement;
     const float error = target - measurement;
     const float integral_step = std::clamp(error * dt_, -integral_scope_, integral_scope_);
     integral_ = std::clamp(integral_ + integral_step, -i_limit_, i_limit_);
