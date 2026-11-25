@@ -30,7 +30,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "Application.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -124,16 +124,23 @@ int main(void)
   MX_UART9_Init();
   MX_CRC_Init();
   /* USER CODE BEGIN 2 */
-
+  Application_Init();
+  __HAL_TIM_CLEAR_FLAG(&htim7, TIM_FLAG_UPDATE);
+  if (HAL_TIM_Base_Start_IT(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    Application_Loop();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    
   }
   /* USER CODE END 3 */
 }
@@ -241,7 +248,7 @@ void PeriphCommonClock_Config(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
-
+  Application_Timer_Callback(htim);
   /* USER CODE END Callback 0 */
   if (htim->Instance == TIM23)
   {

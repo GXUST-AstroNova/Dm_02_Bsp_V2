@@ -11,7 +11,8 @@ struct Group {
 };
 std::array<Group, 3> groups{};
 constexpr double radians_per_count = 2.0 * std::numbers::pi / 8192;
-constexpr float raw_per_amp = 16384.0f / 20.0f;
+constexpr int32_t max_current_raw = 16384;
+constexpr float raw_per_amp = max_current_raw / 20.0f;
 
 Group* findGroup(FDCAN_HandleTypeDef* bus) noexcept {
     for (auto& group : groups) {
@@ -60,6 +61,13 @@ bool M3508::setTorque(float torque_nm) noexcept {
     return true;
 }
 
+bool M3508::setCurrentRaw(int32_t current_raw) noexcept {
+    IrqGuard guard;
+    if (!registered_) return false;
+    current_target_ = static_cast<int16_t>(std::clamp(current_raw, -max_current_raw, max_current_raw));
+    return true;
+}
+
 bool M3508::disable() noexcept {
     IrqGuard guard;
     current_target_ = 0;
@@ -81,22 +89,31 @@ bool M3508::resetAccumulatedAngle() noexcept {
     return true;
 }
 
+M3508Feedback M3508::feedback() const noexcept {
+    IrqGuard guard;
+    return {feedback_, encoder_counts_, total_counts_, speed_rpm_, current_raw_,
+            current_raw_ / raw_per_amp, temperature_c_};
+}
+
 void M3508::receive(const motor_can::Payload& data) noexcept {
-    const int raw = (data[0] << 8) | data[1];
+    const uint16_t raw = (data[0] << 8) | data[1];
     if (raw >= 8192) return;
     if (feedback_.valid) {
-        int delta = raw - last_raw_;
+        int delta = raw - encoder_counts_;
         if (delta > 4096) delta -= 8192;
         if (delta < -4096) delta += 8192;
         total_counts_ += delta;
     } else {
         total_counts_ = raw;
     }
-    last_raw_ = raw;
+    encoder_counts_ = raw;
+    speed_rpm_ = signedWord(data[2], data[3]);
+    current_raw_ = signedWord(data[4], data[5]);
+    temperature_c_ = data[6];
     feedback_.single_turn_rad = (raw < 4096 ? raw : raw - 8192) * radians_per_count;
     feedback_.multi_turn_rad = total_counts_ * radians_per_count;
-    feedback_.velocity_rad_s = signedWord(data[2], data[3]) * (std::numbers::pi_v<float> / 30);
-    feedback_.torque_nm = signedWord(data[4], data[5]) * (kt_ / raw_per_amp);
+    feedback_.velocity_rad_s = speed_rpm_ * (std::numbers::pi_v<float> / 30);
+    feedback_.torque_nm = current_raw_ * (kt_ / raw_per_amp);
     feedback_.valid = true;
 }
 

@@ -13,8 +13,6 @@ FDCAN2 的内核时钟为 80 MHz。仲裁段每位为 `2 × (1 + 32 + 7)` 个时
 
 总线进入 Bus_Off 后，`hfdcan_bsp` 在错误状态中断里自动调用 `can_bus::Soft_Restart`：先中止未发完的 Tx 请求，再清除 `CCCR.INIT`，控制器自行完成 129 次 11 个连续隐性位的恢复序列后继续收发。若软复位本身失败（`HAL_FDCAN_Stop` 超时会让 HAL 状态机进入 ERROR），总线保持静默且不再上报，需要应用层调用 `can_bus::Hard_Restart` 兜底。
 
-反馈帧的归属只按「总线 + 反馈 ID + `D0[3:0]` 的电机 ID 半字节」判断，不看帧格式：达妙可能用经典帧、带 BRS 的 FD 帧或不带 BRS 的 FD 帧回复，三者都交给同一个解析器；注册时的 `fd_brs` 只决定发送格式。总线看起来没反馈时先读 `can_bus::Rx_Stats(&hfdcanX)`：`frames` 为 0 说明帧根本没进 FIFO（波特率、接线、终端电阻、电机未回包），`frames > 0` 而 `routed == 0` 说明是 ID 或 ID 半字节对不上。
-
 - 达妙使用 `init(command_id, feedback_id)` 注册。第一个参数是发往电调的命令 ID（CAN ID），第二个是电调反馈帧的返回 ID（Master ID）。在构造和注册时都可以直接写整数字面量或 `constexpr` 整数。编译器在缩窄转换前检查两个 ID 是否都在 `0x000…0x7FF` 内。
 - 帧格式默认跟随总线。要显式选择经典 CAN 或 CAN FD + BRS，第三个参数传 `DmCanMode::Classic` 或 `DmCanMode::FdBrs`。原有 `Dm4310 joint(&hfdcan2, command_id, feedback_id)` 写法仍可用，随后调用 `joint.init()` 或 `joint.init(mode)` 注册构造时给定的地址。
 - 各型号直接继承 `DmMotor`。在 `Motor/DM/dm_models.hpp` 中填写与该型号电调寄存器一致的 `T_MAX`。构造该型号时编译器要求它是有限正数，未使用的型号可以保留占位值。各型号共用 `P_MAX = 12.5664 rad` 和 `V_MAX = 45 rad/s`。

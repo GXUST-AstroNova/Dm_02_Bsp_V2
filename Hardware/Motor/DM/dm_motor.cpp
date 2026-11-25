@@ -151,13 +151,11 @@ SendResult DmMotor::sendAll() noexcept {
 }
 
 bool DmMotor::dispatch(FDCAN_HandleTypeDef* bus, uint16_t feedback_id,
-                       const motor_can::Payload& bytes) noexcept {
+                       const motor_can::Payload& bytes, bool fd_brs) noexcept {
     IrqGuard guard;
     for (const auto& entry : motors_) {
         auto* motor = entry.motor;
-        // D0[3:0] carries the motor-ID nibble on every DM feedback frame;
-        // entry.fd_brs only selects the transmit format.
-        if (motor && motor->bus_ == bus && entry.feedback_id == feedback_id &&
+        if (motor && motor->bus_ == bus && entry.fd_brs == fd_brs && entry.feedback_id == feedback_id &&
             (entry.command_id & 15) == (bytes[0] & 15)) {
             motor->receive(bytes);
             return true;
