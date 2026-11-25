@@ -9,7 +9,8 @@ namespace Application {
     vofa debug(&huart1);
     Dm4340 test(&hfdcan2,0x10,0x20);
     M3508 test2(&hfdcan1,1);
-    PositionalPID pid(1.0f, 0.0f, 0.0f, 3.0f, 0.001f, 16384.0f);
+    PositionalPID pid(2.35774439905299f, 11.9385210857994f, 0.0392852533458006f, 6000.0f, 0.001f, 16384.0f);
+    uint32_t loop_count = 0;
 }
 
 void Application_Init() {
@@ -17,7 +18,7 @@ void Application_Init() {
     can_bus::start(&hfdcan1);
     can_bus::start(&hfdcan2);
     can_bus::start(&hfdcan3);
-    HAL_Delay(1000);
+    
     Application::test.init(DmCanMode::BusDefault);
     Application::test.enable();
     if (!Application::test2.init()) Error_Handler();
@@ -27,7 +28,12 @@ void Application_Init() {
 }
 
 void Application_Loop() {
-    
+    if(Application::loop_count<5000){
+        
+    }else if(Application::loop_count==5000){
+        Application::pid.Calculate(5000.0f, Application::test2.feedback().speed_rpm);
+        Application::loop_count+=10;
+    }
 }
 
 void Application_Timer_Callback(TIM_HandleTypeDef *htim) {
@@ -36,10 +42,13 @@ void Application_Timer_Callback(TIM_HandleTypeDef *htim) {
         //1khz
         const auto feedback = Application::test2.feedback();
         if (feedback.valid) {
-            Application::test2.setCurrentRaw(Application::pid.Calculate(1.0f, feedback.speed_rpm));
+            Application::test2.setCurrentRaw(Application::pid.Calculate( feedback.speed_rpm));
         }
         Application::debug.send();
         DmMotor::sendAll();
         DjiMotorGroup::sendAll();
+        if(Application::loop_count < 5000) {
+            Application::loop_count++;
+        }
     }
 }
