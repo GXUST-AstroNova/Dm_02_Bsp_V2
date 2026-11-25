@@ -1,3 +1,6 @@
 [submodule "Tools/ThirdParty/Fusion"]
 	path = Tools/ThirdParty/Fusion
 	url = https://github.com/xioTechnologies/Fusion
+[submodule "Tools/ThirdParty/BoostPFR"]
+	path = Tools/ThirdParty/BoostPFR
+	url = https://github.com/boostorg/pfr.git

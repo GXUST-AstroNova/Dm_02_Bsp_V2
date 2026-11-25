@@ -1,9 +1,32 @@
 #include "hfdcan_bsp.h"
+#include "irq_guard.hpp"
 #include "dm_motor.hpp"
 #include "m3508.hpp"
 #include <algorithm>
 
 namespace {
+struct FdSubscription {
+    FDCAN_HandleTypeDef* bus;
+    uint32_t id;
+    void* context;
+    can_bus::FdReceiver receive;
+};
+std::array<FdSubscription, 8> fdSubscriptions{};
+
+bool dispatchFd(FDCAN_HandleTypeDef* bus, const FDCAN_RxHeaderTypeDef& header,
+                const std::array<uint8_t, 64>& buffer) noexcept {
+    if (header.IdType != FDCAN_STANDARD_ID || header.RxFrameType != FDCAN_DATA_FRAME ||
+        header.FDFormat != FDCAN_FD_CAN || header.DataLength >= can_bus::fdLengths.size() ||
+        header.BitRateSwitch != (motor_can::usesFdBrs(bus) ? FDCAN_BRS_ON : FDCAN_BRS_OFF)) return false;
+    for (const auto& entry : fdSubscriptions) {
+        if (entry.bus == bus && entry.id == header.Identifier) {
+            entry.receive(entry.context, std::span(buffer).first(can_bus::fdLengths[header.DataLength]));
+            return true;
+        }
+    }
+    return false;
+}
+
 uint32_t rxNotification(FDCAN_HandleTypeDef* bus) noexcept {
     return bus->Init.RxFifo0ElmtsNbr ? FDCAN_IT_RX_FIFO0_NEW_MESSAGE : FDCAN_IT_RX_FIFO1_NEW_MESSAGE;
 }
@@ -23,6 +46,7 @@ void drain(FDCAN_HandleTypeDef* bus, uint32_t fifo) noexcept {
     FDCAN_RxHeaderTypeDef header{};
     while (HAL_FDCAN_GetRxFifoFillLevel(bus, fifo)) {
         if (HAL_FDCAN_GetRxMessage(bus, fifo, &header, buffer.data()) != HAL_OK) break;
+        if (dispatchFd(bus, header, buffer)) continue;
         if (header.IdType != FDCAN_STANDARD_ID || header.RxFrameType != FDCAN_DATA_FRAME ||
             header.DataLength != FDCAN_DLC_BYTES_8) continue;
         const bool classic = header.FDFormat == FDCAN_CLASSIC_CAN && header.BitRateSwitch == FDCAN_BRS_OFF;
@@ -36,6 +60,50 @@ void drain(FDCAN_HandleTypeDef* bus, uint32_t fifo) noexcept {
     }
 }
 } // namespace
+
+bool can_bus::subscribeFd(FDCAN_HandleTypeDef& bus, uint32_t id, void* context, FdReceiver receive) noexcept {
+    if (!context || !receive || id > 0x7ff || bus.Init.FrameFormat == FDCAN_FRAME_CLASSIC) return false;
+    IrqGuard guard;
+    FdSubscription* freeSlot = nullptr;
+    for (auto& entry : fdSubscriptions) {
+        if ((entry.bus == &bus && entry.id == id) || entry.context == context) {
+            return false;
+        }
+        if (!entry.bus && !freeSlot) freeSlot = &entry;
+    }
+    if (freeSlot) *freeSlot = {&bus, id, context, receive};
+    return freeSlot != nullptr;
+}
+
+void can_bus::unsubscribeFd(void* context) noexcept {
+    IrqGuard guard;
+    for (auto& entry : fdSubscriptions) {
+        if (entry.context == context) entry = {};
+    }
+}
+
+uint32_t can_bus::txSlots(FDCAN_HandleTypeDef& bus) noexcept {
+    return HAL_FDCAN_GetTxFifoFreeLevel(&bus);
+}
+
+bool can_bus::enqueueFd(FDCAN_HandleTypeDef& bus, uint32_t id, std::span<const uint8_t, 64> buffer,
+                        uint8_t length) noexcept {
+    const auto dlc = std::find(fdLengths.begin(), fdLengths.end(), length);
+    if (dlc == fdLengths.end() || id > 0x7ff || bus.Init.FrameFormat == FDCAN_FRAME_CLASSIC ||
+        bus.Init.TxElmtSize * 4U < length + 8U) return false;
+    FDCAN_TxHeaderTypeDef header{};
+    header.Identifier = id;
+    header.IdType = FDCAN_STANDARD_ID;
+    header.TxFrameType = FDCAN_DATA_FRAME;
+    header.DataLength = static_cast<uint32_t>(dlc - fdLengths.begin());
+    header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+    header.BitRateSwitch = motor_can::usesFdBrs(&bus) ? FDCAN_BRS_ON : FDCAN_BRS_OFF;
+    header.FDFormat = FDCAN_FD_CAN;
+    header.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+    IrqGuard guard;
+    const bool queued = HAL_FDCAN_AddMessageToTxFifoQ(&bus, &header, buffer.data()) == HAL_OK;
+    return queued;
+}
 
 bool can_bus::start(FDCAN_HandleTypeDef* bus) noexcept {
     if (!bus || (!bus->Init.RxFifo0ElmtsNbr && !bus->Init.RxFifo1ElmtsNbr)) return false;
