@@ -25,7 +25,7 @@ public:
                             DmCanMode mode = DmCanMode::BusDefault) noexcept;
     // Convenience for models constructed with both IDs.
     [[nodiscard]] bool init(DmCanMode mode = DmCanMode::BusDefault) noexcept;
-    bool enable() noexcept;
+    bool enable() noexcept override;
     bool disable() noexcept override;
     bool clearFault() noexcept;
     bool setTorque(float torque_nm) noexcept override;

@@ -22,6 +22,7 @@ public:
     Motor& operator=(const Motor&) = delete;
 
     virtual bool setTorque(float torque_nm) noexcept = 0;
+    virtual bool enable() noexcept = 0;
     virtual bool disable() noexcept = 0;
     [[nodiscard]] MotorFeedback feedback() const noexcept;
 protected:
