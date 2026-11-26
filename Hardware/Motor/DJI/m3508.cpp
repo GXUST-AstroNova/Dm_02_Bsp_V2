@@ -114,6 +114,7 @@ void M3508::receive(const motor_can::Payload& data) noexcept {
     feedback_.multi_turn_rad = total_counts_ * radians_per_count;
     feedback_.velocity_rad_s = speed_rpm_ * (std::numbers::pi_v<float> / 30);
     feedback_.torque_nm = current_raw_ * (kt_ / raw_per_amp);
+    feedback_.last_rx_ms = HAL_GetTick();
     feedback_.valid = true;
 }
 

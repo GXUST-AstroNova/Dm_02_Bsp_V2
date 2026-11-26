@@ -8,6 +8,7 @@ struct MotorFeedback {
     float velocity_rad_s{};
     float torque_nm{};
     bool valid{};
+    std::uint32_t last_rx_ms{};       // HAL tick when the driver accepted this frame; meaningful when valid.
 };
 
 struct SendResult {

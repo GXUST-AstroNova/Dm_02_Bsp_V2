@@ -178,6 +178,7 @@ void DmMotor::receive(const motor_can::Payload& data) noexcept {
     feedback_.single_turn_rad = wrappedAngle(position);
     feedback_.velocity_rad_s = decode((data[3] << 4) | (data[4] >> 4), V_MAX, 4095);
     feedback_.torque_nm = decode(((data[4] & 15) << 8) | data[5], t_max_, 4095);
+    feedback_.last_rx_ms = HAL_GetTick();
     feedback_.valid = true;
     if ((data[0] >> 4) >= 8) {
         enabled_ = false;
