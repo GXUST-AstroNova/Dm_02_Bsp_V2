@@ -75,6 +75,12 @@ DmMotor::~DmMotor() {
     if (registration_) *registration_ = {};
 }
 
+void DmMotor::setObserveOnly() noexcept {
+    IrqGuard guard;
+    observe_only_ = true;
+    enabled_ = false;
+}
+
 bool DmMotor::specialCommand(uint8_t opcode) noexcept {
     motor_can::Payload bytes{};
     bytes.fill(0xff);
