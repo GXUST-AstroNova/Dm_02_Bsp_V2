@@ -9,7 +9,7 @@ namespace Application {
     vofa debug(&huart1);
     Dm4340 test(&hfdcan2,0x10,0x20);
     M3508 test2(&hfdcan1,1);
-    PositionalPID pid(2.35774439905299f, 11.9385210857994f, 0.0392852533458006f, 6000.0f, 0.001f, 16384.0f);
+    PositionalPID pid(2.70633115413388f, 23.543395974493f, 0.0317760653810761f, 6000.0f, 0.001f, 16384.0f);
     uint32_t loop_count = 0;
 }
 
@@ -18,7 +18,6 @@ void Application_Init() {
     can_bus::start(&hfdcan1);
     can_bus::start(&hfdcan2);
     can_bus::start(&hfdcan3);
-    
     Application::test.init(DmCanMode::BusDefault);
     Application::test.enable();
     if (!Application::test2.init()) Error_Handler();

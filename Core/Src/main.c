@@ -125,6 +125,7 @@ int main(void)
   MX_CRC_Init();
   /* USER CODE BEGIN 2 */
   Application_Init();
+  HAL_TIM_Base_Start_IT(&htim7);
   /* USER CODE END 2 */
 
   /* Infinite loop */
